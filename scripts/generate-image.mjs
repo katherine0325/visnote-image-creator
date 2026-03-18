@@ -149,6 +149,8 @@ async function handleImages(page, imagePaths) {
 
 async function main() {
   const { imagePaths, urlData } = splitData(extraData);
+  console.log(`[INFO] 模板: ${TMPL}`);
+  console.log(`[INFO] 参数: ${JSON.stringify(urlData, null, 2)}`);
 
   const dataParam = encodeURIComponent(JSON.stringify(urlData));
   const url = `${SERVER}/editor?apikey=${VISNOTE_API_KEY}&template=${TMPL}&data=${dataParam}${WITH_WATERMARK ? '&watermark=true' : ''}`;
