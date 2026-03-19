@@ -45,7 +45,7 @@ async function checkApiKeyStatus(apiKey, server) {
 
     return true;
   } catch (error) {
-    console.error(`[ERROR] ${error.message}`);
+    console.error(`[ERROR] VisNote 服务连接失败`);
     return false;
   }
 }
@@ -136,6 +136,8 @@ async function handleImages(page, imagePaths) {
   }
 
   for (let i = 0; i < Math.min(imagePaths.length, uploadInputs.length); i++) {
+    await page.waitForTimeout(800);
+
     const imagePath = imagePaths[i];
 
     if (!existsSync(imagePath)) {
