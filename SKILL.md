@@ -50,10 +50,29 @@ Extract following information from user's request:
 
 ### 2. Get Template Registry from API
 
-**Always fetch the latest template list from the API:**
+**Fetch the template list from the API:**
 ```
 GET /api/open/templates
 ```
+
+**Caching Strategy (IMPORTANT):**
+
+**First request in conversation:** Always fetch the latest template list from the API.
+
+**Subsequent requests in the same conversation:**
+- If the user asks to "换个模板" (change template), "再生成一张" (generate another), or similar follow-up requests → **Reuse the previously fetched template list** from this conversation
+- If the user provides a completely new topic/content request → **Fetch the latest template list** from the API again
+
+**Examples of cache reuse:**
+- "换个模板" → use cached template list
+- "再生成一张" → use cached template list
+- "换个风格" → use cached template list
+- "用其他模板试试" → use cached template list
+
+**Examples of cache invalidation (fetch new):**
+- "生成一张关于xxx的新封面" (new topic) → fetch new template list
+- "帮我做一个关于yyy的图" (new content) → fetch new template list
+- User starts a completely new generation task → fetch new template list
 
 **Optional query parameters:**
 - `keyword`: Search by template name/desc/tags (e.g., `?keyword=封面`, `?keyword=正文`)
@@ -96,7 +115,9 @@ curl "https://vis-note.netlify.app/api/open/templates?keyword=封面"
 - `tags`: Classification tags (免费, VIP, 封面, 图片)
 - `value`: Default data structure with all available fields for the template(used in `--data` parameter)
 
-**Critical**: Always call this API at runtime to get latest template configurations. Do NOT hardcode template information in responses.
+**Critical**: 
+- Always call this API at runtime to get latest template configurations. Do NOT hardcode template information in responses.
+- **Apply caching strategy**: Reuse template list within the same conversation for follow-up requests to avoid redundant API calls.
 
 ### 3. Select Appropriate Template
 
@@ -267,7 +288,11 @@ curl "https://vis-note.netlify.app/api/open/templates"
 curl "https://vis-note.netlify.app/api/open/templates?keyword=封面"
 ```
 
-**Always call this API at runtime** - it is the single source of truth for:
+**Call this API with caching strategy:**
+- **First request or new topic**: Always fetch the latest template list
+- **Follow-up requests** ("换个模板", "再生成一张", etc.): Reuse previously fetched template list from this conversation
+
+This API is the single source of truth for:
 - All available templates and their IDs
 - Template descriptions and use cases
 - Default data structure for each template (via `value` field)
@@ -279,6 +304,11 @@ curl "https://vis-note.netlify.app/api/open/templates?keyword=封面"
 - Template data structures may change
 - Descriptions may be updated
 - New fields may be added to `value` objects
+
+**Caching benefits:**
+- Reduces redundant API calls within the same conversation
+- Improves response speed for follow-up requests
+- Balances performance with data freshness (new topics still fetch latest data)
 
 ## Example AI Processing
 
@@ -401,7 +431,8 @@ curl "https://vis-note.netlify.app/api/open/templates?keyword=封面"
 
 ## Important Notes for AI
 
-1. **Always read template registry** - Never assume template structure
+1. **Apply caching strategy** - Reuse template list within conversation for follow-up requests; fetch fresh data for new topics
+2. **Always read template registry** - Never assume template structure
 2. **Use absolute paths** for `--out` parameter
 3. **Properly escape JSON data** - Single quotes for shell, escape inner quotes and newlines
 4. **Default to free templates** unless user explicitly needs VIP features or specifies VIP template
