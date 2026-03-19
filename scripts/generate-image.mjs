@@ -157,7 +157,7 @@ async function main() {
   const dataParam = encodeURIComponent(JSON.stringify(urlData));
   const url = `${SERVER}/editor?apikey=${VISNOTE_API_KEY}&template=${TMPL}&data=${dataParam}${WITH_WATERMARK ? '&watermark=true' : ''}`;
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: true, slowMo: 100 });
   const context = await browser.newContext({
     acceptDownloads: true,
     viewport: { width: 1280, height: 720 },
