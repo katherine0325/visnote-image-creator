@@ -39,7 +39,7 @@ async function checkApiKeyStatus(apiKey, server) {
     const result = await response.json();
 
     if (!result.success) {
-      console.error(`[ERROR] ${result.error}`);
+      console.error(result.error ? `[ERROR] ${result.error}` : `[ERROR] `, result);
       return false;
     }
 
@@ -177,6 +177,8 @@ async function main() {
     }
 
     mkdirSync(path.dirname(OUT), { recursive: true });
+    await page.waitForTimeout(800);
+
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout: 480_000 }),
       page.locator('#generate').click({ timeout: 120_000 }),
