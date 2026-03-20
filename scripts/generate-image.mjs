@@ -23,7 +23,7 @@
  */
 
 import { chromium } from 'playwright';
-import { mkdirSync, existsSync } from 'fs';
+import { mkdirSync, existsSync, writeFileSync } from 'fs';
 import path from 'path';
 import config from '../config.json' with { type: 'json' };
 
@@ -31,20 +31,15 @@ async function checkApiKeyStatus(apiKey, server) {
   try {
     const response = await fetch(`${server}/api/open/check`, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`
-      }
+      headers: { 'Authorization': `Bearer ${apiKey}` }
     });
-
     const result = await response.json();
-
     if (!result.success) {
-      console.error(result.error ? `[ERROR] ${result.error}` : `[ERROR] `, result);
+      console.error(result.error ? `[ERROR] ${result.error}` : `[ERROR]`, result);
       return false;
     }
-
     return true;
-  } catch (error) {
+  } catch {
     console.error(`[ERROR] VisNote 服务连接失败`);
     return false;
   }
@@ -86,11 +81,9 @@ if (args.data) {
   catch { console.error('[ERROR] --data 不是合法 JSON'); process.exit(1); }
 }
 
-console.log(`[INFO] 正在连接到VisNote...`);
+console.log(`[INFO] 正在连接到 VisNote...`);
 const isValid = await checkApiKeyStatus(VISNOTE_API_KEY, SERVER);
-if (!isValid) {
-  process.exit(1);
-}
+if (!isValid) process.exit(1);
 
 function splitData(data) {
   const urlEntries = [];
@@ -101,12 +94,10 @@ function splitData(data) {
       urlEntries.push([key, value]);
       continue;
     }
-
     if (!value || value.startsWith('http')) {
       urlEntries.push([key, value]);
       continue;
     }
-
     imageEntries.push([key, value]);
   }
 
@@ -115,19 +106,16 @@ function splitData(data) {
     return getNum(a[0]) - getNum(b[0]);
   });
 
-  const imagePaths = imageEntries.map(([, value]) => value);
-  const urlData = Object.fromEntries(urlEntries);
-
-  return { imagePaths, urlData };
+  return {
+    imagePaths: imageEntries.map(([, v]) => v),
+    urlData: Object.fromEntries(urlEntries),
+  };
 }
 
 async function handleImages(page, imagePaths) {
-  if (imagePaths.length === 0) {
-    return;
-  }
+  if (imagePaths.length === 0) return;
 
   await page.locator('#toolbar input[type="file"]').waitFor({ state: 'attached', timeout: 30_000 });
-
   const uploadInputs = await page.locator('#toolbar input[type="file"]').all();
 
   if (uploadInputs.length === 0) {
@@ -136,16 +124,23 @@ async function handleImages(page, imagePaths) {
   }
 
   for (let i = 0; i < Math.min(imagePaths.length, uploadInputs.length); i++) {
-    await page.waitForTimeout(800);
-
     const imagePath = imagePaths[i];
-
     if (!existsSync(imagePath)) {
       console.warn(`[WARN] 图片文件不存在，跳过: ${imagePath}`);
       continue;
     }
-
     await uploadInputs[i].setInputFiles(imagePath);
+
+    await page.waitForFunction(
+      (idx) => {
+        const inputs = document.querySelectorAll('#toolbar input[type="file"]');
+        return inputs[idx]?.files?.length > 0;
+      },
+      i,
+      { timeout: 15_000 }
+    ).catch(() => {
+      console.warn(`[WARN] 图片 ${i + 1} 上传确认超时，继续执行`);
+    });
   }
 }
 
@@ -157,36 +152,47 @@ async function main() {
   const dataParam = encodeURIComponent(JSON.stringify(urlData));
   const url = `${SERVER}/editor?apikey=${VISNOTE_API_KEY}&template=${TMPL}&data=${dataParam}${WITH_WATERMARK ? '&watermark=true' : ''}`;
 
-  const browser = await chromium.launch({ headless: true, slowMo: 100 });
+  const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
-    acceptDownloads: true,
-    viewport: { width: 1280, height: 720 },
+    viewport: { width: 1280, height: 900 },
     deviceScaleFactor: 2,
   });
   const page = await context.newPage();
   await page.emulateMedia({ colorScheme: 'light' });
 
   try {
-    console.log(`[INFO] 开始生成图片...`);
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    console.log(`[INFO] 正在生成图片...`);
 
-    await page.locator('#generate').waitFor({ state: 'visible', timeout: 60_000 });
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 60_000 });
+    await page.evaluate(() => document.fonts.ready);
+
+    await page.locator('#generate').waitFor({ state: 'visible', timeout: 30_000 });
 
     if (imagePaths.length > 0) {
       await handleImages(page, imagePaths);
     }
 
     mkdirSync(path.dirname(OUT), { recursive: true });
-    await page.waitForTimeout(800);
 
-    const [download] = await Promise.all([
-      page.waitForEvent('download', { timeout: 480_000 }),
-      page.locator('#generate').click({ timeout: 120_000 }),
-    ]);
-    await download.saveAs(OUT);
+    await page.evaluate(() => { window.__generatedDataUrl = null; });
+
+    await page.locator('#generate').click();
+
+    const dataUrlHandle = await page.waitForFunction(
+      () => (typeof window.__generatedDataUrl === 'string' && window.__generatedDataUrl.length > 0)
+        ? window.__generatedDataUrl
+        : null,
+      { timeout: 120_000, polling: 300 }
+    );
+    const dataUrl = await dataUrlHandle.jsonValue();
+
+    const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+    writeFileSync(OUT, Buffer.from(base64Data, 'base64'));
+
     console.log(`✅ 图片已保存: ${OUT}`);
   } catch (err) {
-    console.error('[ERROR] 生成图片失败:', err);
+    console.error('[ERROR] 生成图片失败:', err.message);
+    process.exitCode = 1;
   } finally {
     await context.close();
     await browser.close();
