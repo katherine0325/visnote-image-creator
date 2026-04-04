@@ -1,5 +1,6 @@
 ---
 name: visnote-images-creator
+version: v1.0.0
 description: This skill should be used when generating XiaoHongShu (小红书) style images. The AI analyzes user requirements, reads template registry to select appropriate template, extracts and merges data with template defaults, and invokes generation script with properly constructed command-line arguments.
 ---
 
