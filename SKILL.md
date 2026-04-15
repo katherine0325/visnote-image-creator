@@ -167,47 +167,70 @@ For each template in the registry array:
 
 #### Data Extraction Rules
 
-**Title Extraction:**
-- Explicit title format: `标题是"xxx"` or `标题是'xxx'`
+**Critical**: The template's `value` object is the foundation - it contains ALL default values including default images, colors, text, ratio, etc. Always start with this complete object and only override what user explicitly provides.
+
+**Field Extraction Priority - Check template.value for these fields:**
+
+**1. Title Extraction:**
+- Explicit title format: `标题是"xxx"` or `标题是'xxx'` or `主题是"xxx"`
 - Quoted content: Look for content in quotes that seems like a title
 - If not specified: Use template's `value.title` (template default)
 
-**Subtitle/Body Text Extraction:**
-- Check if template's `value` has `subtitle` or `bodyText` fields
-- If user explicitly provides subtitle/body: use user value
+**2. Subtitle Extraction:**
+- Check if template's `value` has `subtitle` field
+- If user explicitly provides subtitle: use user value
 - If user doesn't explicitly provide but mentions secondary content (e.g., "OOTD 穿搭封面"):
   - Extract from description and fill appropriate field
   - Example: "生成 OOTD 穿搭封面" → `subtitle` could be "穿搭分享 | 日常记录"
-  - Example: "日常碎碎念" → `bodyText` could be "今天天气真好\n心情超级棒"
-- If no user content available: Use template's `value.subtitle` or `value.bodyText` (template default)
+- If no user content available: Use template's `value.subtitle` (template default)
 
-**Image Fields (Critical):**
+**3. Body Text Extraction:**
+- Check if template's `value` has `bodyText` field
+- Long-form content, paragraphs, lists
+- User's main content description
+- If not specified: Use template's `value.bodyText` (template default)
+
+**4. Tag Extraction:**
+- Look for category tags: 干货, 教程, 避坑, 分享, 笔记, 生活, 日常, OOTD, 穿搭, 探店, 情感, 故事, 对话, etc.
+- Format as "xxx分享" if needed (e.g., "干货" → "干货分享")
+- If not specified: Use template's `value.tag` (template default)
+
+**5. Author Extraction:**
+- Extract @mentions: @username patterns
+- Set as `author` field if template supports it (include the @ symbol)
+- If not specified: Use template's `value.author` if exists (template default)
+
+**6. Color Extraction:**
+- Look for hex color codes: #RRGGBB format
+- Named colors mentioned by user (e.g., "红色", "蓝色")
+- If not specified: Use template's `value.color` if exists (template default)
+
+**7. Ratio Extraction (宽高比) - IMPORTANT:**
+- Look for: `ratio:auto`, `ratio:3/4`, `ratio:1/1`, `ratio:4/3`, `ratio:9/16`, `ratio:16/9`
+- Also accept: `ratio:3:4`, `ratio:1:1`, etc.
+- Valid values: `auto`, `1:1`, `3:4`, `4:3`, `9:16`, `16:9` (and slash variants)
+- If not specified: Use template's `value.ratio` if exists (template default)
+
+**8. Image Fields Extraction:**
 - Check if template's `value` contains `image`, `image2`, etc.
+- `image`: Primary image path or URL
+- `image2`: Secondary image (for comparison templates)
 - **Always keep template default images** if user doesn't explicitly provide their own image paths
 - Template defaults ensure template works without user-supplied images
 - Example: Magazine template has `image: '/images/jimeng-20260125.png'` → keep this unless user specifies otherwise
+- If not specified: Use template's `value.image`, `value.image2` (template defaults)
 
-**Tag Extraction:**
-- Look for category tags: 干货, 教程, 避坑, 分享, 笔记, 生活, 日常, etc.
-- Format as "xxx分享" if needed
-- If not specified: Use template's `value.tag` (template default)
-
-**Author Extraction:**
-- Extract @mentions: @username patterns
-- Set as `author` field if template supports it
-- If not specified: Use template's `value.author` if exists (template default)
-
-**Color Extraction:**
-- Look for hex color codes: #RRGGBB format
-- Set as `color` field if template supports it
-- If not specified: Use template's `value.color` if exists (template default)
+**9. Step Extraction (步骤编号):**
+- For tutorial/step templates
+- Look for format: `step:02/5`, `step:3`, etc.
+- If not specified: Use template's `value.step` if exists (template default)
 
 **Template-Specific Fields:**
 - Identify ALL fields present in template's `value` object
 - For each field:
   - If user explicitly provides value: use user value
   - If user doesn't provide: use template's default value
-- Examples: `image`, `image2` for comparison styles; `step` for tutorial styles
+- Always include ALL fields from template's `value` in the final data object
 
 #### Merge Strategy
 
@@ -430,6 +453,45 @@ This API is the single source of truth for:
    - Image 6 (建议): "建议" + subtitle about tips
 6. **Important**: When generating multiple images, wait 10-15 seconds between requests to avoid Next.js server timeout
 
+### Example 5: Using Ratio Parameter
+
+**User Request:** "visnote生成图片，模板memo，ratio:auto，标题：一键下载商品图片，正文：🌟 电商主图、详情图、SKU图、视频一键下载
+🌟 淘宝/天猫、1688、阿里巴巴国际站、京东、得物、抖音商品、小红书商品、Amazon、闲鱼、唯品会、苏宁、当当
+🌟 网盘发货，会员码安装
+🌟 使用场景详见下图
+
+注意事项：
+⭕️ 适用于chrome、edge、夸克、QQ浏览器PC端（手机端不适用）
+⭕️ 小红书商品和抖音商品无法获取SKU图
+⭕️ 小红书商品商品、Amazon、闲鱼无法获取视频
+⭕️ 本商品为虚拟物品不支持7天无理由退货"
+
+**AI Processing:**
+
+1. **Analyze Request**: Explicit template ID (memo) + explicit ratio (auto) + title + body text with emojis and line breaks
+2. **Fetch Template Registry**: Call `GET /api/open/templates` to get all templates
+3. **Select Template**: User explicitly specified `memo` template
+4. **Extract User Data**:
+   - Template: `memo` (user-specified)
+   - Ratio: `auto` (user-specified) - **IMPORTANT: must be in `--data` JSON**
+   - Title: "一键下载商品图片"
+   - BodyText: Full text with emojis and line breaks
+5. **Merge with Template Defaults**:
+   ```json
+   {
+     "title": "一键下载商品图片",  // user-provided
+     "bodyText": "🌟 电商主图、详情图、SKU图、视频一键下载\\n🌟 淘宝/天猫、1688、阿里巴巴国际站、京东、得物、抖音商品、小红书商品、Amazon、闲鱼、唯品会、苏宁、当当\\n🌟 网盘发货，会员码安装\\n🌟 使用场景详见下图\\n\\n注意事项：\\n⭕️ 适用于chrome、edge、夸克、QQ浏览器PC端（手机端不适用）\\n⭕️ 小红书商品和抖音商品无法获取SKU图\\n⭕️ 小红书商品商品、Amazon、闲鱼无法获取视频\\n⭕️ 本商品为虚拟物品不支持7天无理由退货",  // user-provided
+     "ratio": "auto"  // user-provided - placed inside --data JSON
+   }
+   ```
+6. **Construct Command**:
+   ```bash
+   node scripts/generate-image.mjs \
+     --template memo \
+     --data '{"title":"一键下载商品图片","bodyText":"🌟 电商主图、详情图、SKU图、视频一键下载\\n🌟 淘宝/天猫、1688、阿里巴巴国际站、京东、得物、抖音商品、小红书商品、Amazon、闲鱼、唯品会、苏宁、当当\\n🌟 网盘发货，会员码安装\\n🌟 使用场景详见下图\\n\\n注意事项：\\n⭕️ 适用于chrome、edge、夸克、QQ浏览器PC端（手机端不适用）\\n⭕️ 小红书商品和抖音商品无法获取SKU图\\n⭕️ 小红书商品商品、Amazon、闲鱼无法获取视频\\n⭕️ 本商品为虚拟物品不支持7天无理由退货","ratio":"auto"}' \
+     --out ~/Downloads/visnote-20260303150000.png
+   ```
+
 ## Important Notes for AI
 
 1. **Apply caching strategy** - Reuse template list within conversation for follow-up requests; fetch fresh data for new topics
@@ -450,6 +512,7 @@ This API is the single source of truth for:
     - For comparison: look for '对比' in `desc` or name
     - For tutorials/steps: look for '步骤' in `desc` or name
 12. **Batch generation tip**: When generating multiple images, wait 10-15 seconds between requests to avoid Next.js server timeout
+13. **Ratio field placement**: The `ratio` must ALWAYS be inside the `--data` JSON object, never as a separate parameter. Example: `--data '{"title":"xxx","ratio":"auto"}'` ✓, NOT `--template yellow --ratio auto` ✗
 
 ## Prerequisites for Execution
 
