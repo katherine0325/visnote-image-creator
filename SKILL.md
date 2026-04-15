@@ -455,7 +455,7 @@ This API is the single source of truth for:
 
 ### Example 5: Using Ratio Parameter
 
-**User Request:** "visnote生成图片，模板memo，ratio:auto，标题：一键下载商品图片，正文：🌟 电商主图、详情图、SKU图、视频一键下载
+**User Request:** "visnote生成图片，模板memo，标题：一键下载商品图片，正文：🌟 电商主图、详情图、SKU图、视频一键下载
 🌟 淘宝/天猫、1688、阿里巴巴国际站、京东、得物、抖音商品、小红书商品、Amazon、闲鱼、唯品会、苏宁、当当
 🌟 网盘发货，会员码安装
 🌟 使用场景详见下图
@@ -464,7 +464,7 @@ This API is the single source of truth for:
 ⭕️ 适用于chrome、edge、夸克、QQ浏览器PC端（手机端不适用）
 ⭕️ 小红书商品和抖音商品无法获取SKU图
 ⭕️ 小红书商品商品、Amazon、闲鱼无法获取视频
-⭕️ 本商品为虚拟物品不支持7天无理由退货"
+⭕️ 本商品为虚拟物品不支持7天无理由退货，ratio：auto"
 
 **AI Processing:**
 
